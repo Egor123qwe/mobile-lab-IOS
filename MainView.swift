@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     @State private var selectedTab: Tab = .products
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     enum Tab {
         case profile, products, favorites
@@ -11,7 +12,7 @@ struct MainView: View {
         ZStack {
             Color.white.ignoresSafeArea()
             
-            RouterView(selectedTab: $selectedTab).padding(.top, 50)
+            RouterView(selectedTab: $selectedTab).padding(.top, 50).environmentObject(authViewModel)
             
             VStack {
                 HeaderView(selectedTab: $selectedTab)
@@ -22,7 +23,3 @@ struct MainView: View {
     }
 }
 
-
-#Preview {
-    MainView()
-}

@@ -1,7 +1,13 @@
 import SwiftUI
 
 struct FavoriteView: View {
-    @StateObject private var viewModel = ProductViewModel(onlyFavorite: true)
+    @EnvironmentObject var authViewModel: AuthViewModel // Получаем AuthViewModel из environment
+    @StateObject private var viewModel: ProductViewModel
+
+    // Конструктор для инициализации viewModel
+    init() {
+        _viewModel = StateObject(wrappedValue: ProductViewModel(onlyFavorite: true, authViewModel: AuthViewModel()))
+    }
 
     var body: some View {
         VStack {
