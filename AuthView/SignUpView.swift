@@ -2,7 +2,6 @@ import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
 
-
 struct SignUpView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     var navigateBack: (() -> Void)?
@@ -21,83 +20,101 @@ struct SignUpView: View {
                 .font(.largeTitle)
                 .padding(.bottom, 20)
             
-            TextField("Имя", text: $name)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal, 40)
+            inputField(title: "Имя", text: $name)
+            inputField(title: "Email", text: $email)
+            secureInputField(title: "Пароль", text: $password)
+            secureInputField(title: "Подтвердите пароль", text: $confirmPassword)
             
-            TextField("Email", text: $email)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal, 40)
-                .padding(.top, 10)
+            errorMessageView
             
-            SecureField("Пароль", text: $password)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal, 40)
-                .padding(.top, 10)
+            createAccountButton
             
-            SecureField("Подтвердите пароль", text: $confirmPassword)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal, 40)
-                .padding(.top, 10)
-            
+            Spacer()
+        }
+        .padding(.horizontal, 40)
+    }
+    
+    private var errorMessageView: some View {
+        Group {
             if !errorMessage.isEmpty {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.caption)
                     .padding(.top, 10)
             }
-            
-            Button(action: {
-                errorMessage = ""
-                
-                if password != confirmPassword {
-                    errorMessage = "Пароли не совпадают"
-                } else if email.isEmpty || password.isEmpty || name.isEmpty {
-                    errorMessage = "Все поля обязательны для заполнения"
-                } else {
-                    signUp()
-                }
-            }) {
-                Text("Создать")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.green)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                    .padding(.horizontal, 40)
-                    .padding(.top, 20)
-            }
-            
-            Spacer()
         }
     }
     
+    private var createAccountButton: some View {
+        Button(action: handleSignUp) {
+            Text("Создать")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.green)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+        }
+        .padding(.top, 20)
+    }
+    
+    private func inputField(title: String, text: Binding<String>) -> some View {
+        TextField(title, text: text)
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .padding(.top, 10)
+    }
+    
+    private func secureInputField(title: String, text: Binding<String>) -> some View {
+        SecureField(title, text: text)
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .padding(.top, 10)
+    }
+    
+    private func handleSignUp() {
+        errorMessage = ""
+        
+        // Валидация
+        if !validateFields() {
+            return
+        }
+        
+        signUp()
+    }
+    
+    private func validateFields() -> Bool {
+        if password != confirmPassword {
+            errorMessage = "Пароли не совпадают"
+            return false
+        } else if email.isEmpty || password.isEmpty || name.isEmpty {
+            errorMessage = "Все поля обязательны для заполнения"
+            return false
+        }
+        return true
+    }
+    
     private func signUp() {
-           Auth.auth().createUser(withEmail: email, password: password) { 
-               result, error in
-               if let error = error {
-                   errorMessage = "Ошибка: \(error.localizedDescription)"
-                   return
-               }
-               
-               if let user = result?.user {
-                   let userData: [String: Any] = [
-                       "name": name,
-                       "email": email
-                   ]
-                   
-                   db.collection("users").document(user.uid).setData(userData) { error in
-                        if let error = error {
-                            errorMessage = "Ошибка сохранения данных: \(error.localizedDescription)"
-                            
-                            return
-                        }
-                    }
-               }
-               
-               navigateBack?()
-           }
-       }
+        Auth.auth().createUser(withEmail: email, password: password) { result, error in
+            if let error = error {
+                errorMessage = "Ошибка: \(error.localizedDescription)"
+                return
+            }
+            
+            guard let user = result?.user else { return }
+            saveUserData(user)
+        }
+    }
+    
+    private func saveUserData(_ user: FirebaseAuth.User) {
+        let userData: [String: Any] = [
+            "name": name,
+            "email": email
+        ]
+        
+        db.collection("users").document(user.uid).setData(userData) { error in
+            if let error = error {
+                errorMessage = "Ошибка сохранения данных: \(error.localizedDescription)"
+            }
+        }
+        
+        navigateBack?()
+    }
 }
-
-

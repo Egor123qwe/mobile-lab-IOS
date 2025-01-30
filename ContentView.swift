@@ -5,12 +5,18 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            if authViewModel.isAuthenticated {
-                MainView().environmentObject(authViewModel)
-            } else {
-                StartScreenView().environmentObject(authViewModel)
-            }
+            contentView
         }
     }
+    
+    private var contentView: some View {
+        Group {
+            if authViewModel.isAuthenticated {
+                MainView()
+            } else {
+                StartScreenView()
+            }
+        }
+        .environmentObject(authViewModel) // Применяем только один раз для всех представлений
+    }
 }
-

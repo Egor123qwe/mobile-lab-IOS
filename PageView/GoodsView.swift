@@ -50,7 +50,7 @@ class ProductViewModel: ObservableObject {
             let favoriteProductIds = try await getFavoriteProductIds(for: userId)
 
             // Запрос товаров
-            var query: Query = db.collection("products").order(by: "name").limit(to: 30)
+            var query: Query = db.collection("products").order(by: "name").limit(to: 10)
             if let lastDoc = lastDocument {
                 query = query.start(afterDocument: lastDoc)
             }

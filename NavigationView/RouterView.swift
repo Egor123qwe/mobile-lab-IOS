@@ -6,16 +6,21 @@ struct RouterView: View {
     
     var body: some View {
         VStack {
-            switch selectedTab {
-            case .profile:
-                ProfileView()
-            case .products:
-                GoodsView()
-                    .environmentObject(authViewModel)
-            case .favorites:
-                FavoriteView()
-                    .environmentObject(authViewModel)
-            }
+            renderTabView()
+        }
+    }
+    
+    private func renderTabView() -> some View {
+        switch selectedTab {
+        case .profile:
+            return AnyView(ProfileView())
+            
+        case .products:
+            return AnyView(GoodsView()
+                            .environmentObject(authViewModel))
+        case .favorites:
+            return AnyView(FavoriteView()
+                            .environmentObject(authViewModel))
         }
     }
 }

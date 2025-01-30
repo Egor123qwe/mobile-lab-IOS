@@ -3,22 +3,34 @@ import FirebaseAuth
 
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated: Bool = false
-    @Published var id: String? // Сделано опциональным
+    @Published var id: String?
 
     init() {
+        checkAuthenticationStatus()
+    }
+
+    private func checkAuthenticationStatus() {
         if let user = Auth.auth().currentUser {
-            self.id = user.uid
-            self.isAuthenticated = true
+            id = user.uid
+            isAuthenticated = true
         }
     }
 
     func signOut() {
         do {
             try Auth.auth().signOut()
-            isAuthenticated = false
-            id = nil // Обнуляем id при выходе
+            resetAuthenticationState()
         } catch {
-            print("Ошибка выхода: \(error.localizedDescription)")
+            handleSignOutError(error)
         }
+    }
+
+    private func resetAuthenticationState() {
+        isAuthenticated = false
+        id = nil
+    }
+
+    private func handleSignOutError(_ error: Error) {
+        print("Ошибка выхода: \(error.localizedDescription)")
     }
 }

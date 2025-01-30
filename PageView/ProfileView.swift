@@ -11,102 +11,21 @@ struct ProfileView: View {
     @State private var errorMessage = ""
     
     // Поля профиля
-    @State private var name = ""
-    @State private var email = ""
-    @State private var dateOfBirth = ""
-    @State private var phoneNumber = ""
-    @State private var address = ""
-    @State private var bio = ""
-    @State private var occupation = ""
-    @State private var website = ""
-    @State private var socialMedia = ""
-    @State private var additionalInfo = ""
-    
+    @State private var profileData = ProfileData()
+
     var body: some View {
-        VStack(alignment: .leading) { // Выравнивание по левому краю
+        VStack(alignment: .leading) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if isLoading {
                         ProgressView("Загрузка профиля...")
                             .padding()
                     } else {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 20) {
-                                if isEditing {
-                                    // Поля ввода для редактирования профиля
-                                    ProfileFieldEditor(title: "Имя", text: $name)
-                                    ProfileFieldEditor(title: "Email", text: $email)
-                                    ProfileFieldEditor(title: "Дата рождения", text: $dateOfBirth)
-                                    ProfileFieldEditor(title: "Телефон", text: $phoneNumber)
-                                    ProfileFieldEditor(title: "Адрес", text: $address)
-                                    ProfileFieldEditor(title: "О себе", text: $bio)
-                                    ProfileFieldEditor(title: "Профессия", text: $occupation)
-                                    ProfileFieldEditor(title: "Веб-сайт", text: $website)
-                                    ProfileFieldEditor(title: "Соцсети", text: $socialMedia)
-                                    ProfileFieldEditor(title: "Дополнительно", text: $additionalInfo)
-                                    
-                                    Button(action: {
-                                        deleteAccount()
-                                    }) {
-                                        Text("Удалить аккаунт")
-                                            .frame(maxWidth: .infinity)
-                                            .padding()
-                                            .background(Color.red)
-                                            .foregroundColor(.white)
-                                            .cornerRadius(10)
-                                    }
-                                } else {
-                                    // Информация профиля
-                                    ProfileField(title: "Имя", value: name)
-                                    ProfileField(title: "Email", value: email)
-                                    ProfileField(title: "Дата рождения", value: dateOfBirth)
-                                    ProfileField(title: "Телефон", value: phoneNumber)
-                                    ProfileField(title: "Адрес", value: address)
-                                    ProfileField(title: "О себе", value: bio)
-                                    ProfileField(title: "Профессия", value: occupation)
-                                    ProfileField(title: "Веб-сайт", value: website)
-                                    ProfileField(title: "Соцсети", value: socialMedia)
-                                    ProfileField(title: "Дополнительно", value: additionalInfo)
-                                }
-                            }
-                            .padding()
-                        }
-                        
-                        // Кнопки управления
-                        HStack {
-                            Button(action: {
-                                if isEditing {
-                                    saveProfileData()
-                                }
-                                isEditing.toggle()
-                            }) {
-                                Text(isEditing ? "Сохранить" : "Редактировать")
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(isEditing ? Color.green : Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
-                            }
-                            
-                            Button(action: {
-                                authViewModel.signOut()
-                            }) {
-                                Text("Выйти")
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.red)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
-                            }
-                        }
-                        .padding()
+                        profileContent
                     }
                     
                     if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .padding()
+                        errorMessageView
                     }
                 }
                 .onAppear {
@@ -116,37 +35,109 @@ struct ProfileView: View {
         }
     }
     
-    // Загрузка данных профиля из Firestore
+    private var profileContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if isEditing {
+                ProfileFieldEditor(title: "Имя", text: $profileData.name)
+                ProfileFieldEditor(title: "Email", text: $profileData.email)
+                ProfileFieldEditor(title: "Дата рождения", text: $profileData.dateOfBirth)
+                ProfileFieldEditor(title: "Телефон", text: $profileData.phoneNumber)
+                ProfileFieldEditor(title: "Адрес", text: $profileData.address)
+                ProfileFieldEditor(title: "О себе", text: $profileData.bio)
+                ProfileFieldEditor(title: "Профессия", text: $profileData.occupation)
+                ProfileFieldEditor(title: "Веб-сайт", text: $profileData.website)
+                ProfileFieldEditor(title: "Соцсети", text: $profileData.socialMedia)
+                ProfileFieldEditor(title: "Дополнительно", text: $profileData.additionalInfo)
+                
+                deleteAccountButton
+            } else {
+                ProfileField(title: "Имя", value: profileData.name)
+                ProfileField(title: "Email", value: profileData.email)
+                ProfileField(title: "Дата рождения", value: profileData.dateOfBirth)
+                ProfileField(title: "Телефон", value: profileData.phoneNumber)
+                ProfileField(title: "Адрес", value: profileData.address)
+                ProfileField(title: "О себе", value: profileData.bio)
+                ProfileField(title: "Профессия", value: profileData.occupation)
+                ProfileField(title: "Веб-сайт", value: profileData.website)
+                ProfileField(title: "Соцсети", value: profileData.socialMedia)
+                ProfileField(title: "Дополнительно", value: profileData.additionalInfo)
+            }
+
+            buttonsView
+        }
+        .padding()
+    }
+    
+    private var errorMessageView: some View {
+        Text(errorMessage)
+            .foregroundColor(.red)
+            .font(.caption)
+            .padding()
+    }
+
+    private var deleteAccountButton: some View {
+        Button(action: {
+            deleteAccount()
+        }) {
+            Text("Удалить аккаунт")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+        }
+    }
+
+    private var buttonsView: some View {
+        HStack {
+            editSaveButton
+            signOutButton
+        }
+        .padding()
+    }
+    
+    private var editSaveButton: some View {
+        Button(action: {
+            if isEditing {
+                saveProfileData()
+            }
+            isEditing.toggle()
+        }) {
+            Text(isEditing ? "Сохранить" : "Редактировать")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isEditing ? Color.green : Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+        }
+    }
+
+    private var signOutButton: some View {
+        Button(action: {
+            authViewModel.signOut()
+        }) {
+            Text("Выйти")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+        }
+    }
+    
     private func loadProfileData() {
         guard let userID = Auth.auth().currentUser?.uid else {
             errorMessage = "Пользователь не найден."
             isLoading = false
             return
         }
-        
+
         db.collection("users").document(userID).getDocument { document, error in
             if let error = error {
                 errorMessage = "Ошибка загрузки профиля: \(error.localizedDescription)"
             } else if let document = document, document.exists {
                 let data = document.data() ?? [:]
-
-                
-                func formattedString(_ value: Any?) -> String {
-                    guard let string = value as? String, !string.isEmpty else { return "-" }
-                    return string
-                }
-
-                self.name = formattedString(data["name"])
-                self.email = formattedString(data["email"])
-                self.dateOfBirth = formattedString(data["dateOfBirth"])
-                self.phoneNumber = formattedString(data["phoneNumber"])
-                self.address = formattedString(data["address"])
-                self.bio = formattedString(data["bio"])
-                self.occupation = formattedString(data["occupation"])
-                self.website = formattedString(data["website"])
-                self.socialMedia = formattedString(data["socialMedia"])
-                self.additionalInfo = formattedString(data["additionalInfo"])
-                
+                self.profileData = ProfileData(from: data)
             } else {
                 errorMessage = "Документ профиля не найден."
             }
@@ -160,22 +151,9 @@ struct ProfileView: View {
             return
         }
         
-        isLoading = true // Включаем прелоадер
+        isLoading = true
 
-        let userData: [String: Any] = [
-            "name": name,
-            "email": email,
-            "dateOfBirth": dateOfBirth,
-            "phoneNumber": phoneNumber,
-            "address": address,
-            "bio": bio,
-            "occupation": occupation,
-            "website": website,
-            "socialMedia": socialMedia,
-            "additionalInfo": additionalInfo
-        ]
-        
-        db.collection("users").document(userID).setData(userData) { [self] error in
+        db.collection("users").document(userID).setData(profileData.toDictionary()) { error in
             DispatchQueue.main.async {
                 self.isLoading = false
                 
@@ -188,7 +166,6 @@ struct ProfileView: View {
         }
     }
     
-    // Удаление аккаунта пользователя
     private func deleteAccount() {
         guard let userID = Auth.auth().currentUser?.uid else {
             errorMessage = "Пользователь не найден."
@@ -239,5 +216,52 @@ struct ProfileFieldEditor: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
         }
+    }
+}
+
+struct ProfileData {
+    var name: String = ""
+    var email: String = ""
+    var dateOfBirth: String = ""
+    var phoneNumber: String = ""
+    var address: String = ""
+    var bio: String = ""
+    var occupation: String = ""
+    var website: String = ""
+    var socialMedia: String = ""
+    var additionalInfo: String = ""
+    
+    // Инициализатор по умолчанию
+    init(from data: [String: Any] = [:]) {
+        self.name = formattedString(data["name"])
+        self.email = formattedString(data["email"])
+        self.dateOfBirth = formattedString(data["dateOfBirth"])
+        self.phoneNumber = formattedString(data["phoneNumber"])
+        self.address = formattedString(data["address"])
+        self.bio = formattedString(data["bio"])
+        self.occupation = formattedString(data["occupation"])
+        self.website = formattedString(data["website"])
+        self.socialMedia = formattedString(data["socialMedia"])
+        self.additionalInfo = formattedString(data["additionalInfo"])
+    }
+
+    func toDictionary() -> [String: Any] {
+        return [
+            "name": name,
+            "email": email,
+            "dateOfBirth": dateOfBirth,
+            "phoneNumber": phoneNumber,
+            "address": address,
+            "bio": bio,
+            "occupation": occupation,
+            "website": website,
+            "socialMedia": socialMedia,
+            "additionalInfo": additionalInfo
+        ]
+    }
+    
+    private func formattedString(_ value: Any?) -> String {
+        guard let string = value as? String, !string.isEmpty else { return "-" }
+        return string
     }
 }
