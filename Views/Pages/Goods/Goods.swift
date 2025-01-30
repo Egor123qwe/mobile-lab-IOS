@@ -1,19 +1,6 @@
 import SwiftUI
 import FirebaseFirestore
 
-// MARK: - Модель товара
-struct Product: Identifiable, Codable {
-    @DocumentID var id: String? // Firestore ID
-    var name: String
-    var description: String
-    var images: [String] // Ссылки на изображения
-    var isFavorite: Bool? = true // Опционально с дефолтным значением
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, description, images, isFavorite
-    }
-}
-
 class ProductViewModel: ObservableObject {
     @Published var products: [Product] = []
     @Published var favoriteProductIds: [String] = []
