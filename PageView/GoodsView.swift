@@ -24,17 +24,17 @@ class ProductViewModel: ObservableObject {
     private var db = Firestore.firestore()
     private var lastDocument: DocumentSnapshot? = nil
     private let onlyFavorite: Bool
-    private var authViewModel: AuthViewModel // Добавляем ссылку на AuthViewModel
+    private var authViewModel: AuthViewModel
 
     init(onlyFavorite: Bool = false, authViewModel: AuthViewModel) {
         self.onlyFavorite = onlyFavorite
-        self.authViewModel = authViewModel // Инициализируем authViewModel
+        self.authViewModel = authViewModel
         Task {
             await loadProducts()
         }
     }
 
-    // Загрузка товаров с учетом onlyFavorite
+    /// Загружаем товары
     func loadProducts() async {
         guard !isLoading, !isEndReached else { return }
 
@@ -43,68 +43,36 @@ class ProductViewModel: ObservableObject {
             self.errorMessage = nil
         }
 
-        guard let userId = authViewModel.id else { return } // Убедимся, что есть текущий пользователь
+        guard let userId = authViewModel.id else { return }
 
-        // Запрос товаров
-        var query: Query = db.collection("products").order(by: "name").limit(to: 10)
-        
         do {
-            favoriteProductIds = await getFavoriteProductIds(for: userId)
-        } catch {
-            DispatchQueue.main.async {
-                self.errorMessage = "Ошибка получения избранных товаров \(error.localizedDescription)"
-                
-                self.isLoading = false
+            // Загружаем ID избранных товаров
+            let favoriteProductIds = try await getFavoriteProductIds(for: userId)
+
+            // Запрос товаров
+            var query: Query = db.collection("products").order(by: "name").limit(to: 30)
+            if let lastDoc = lastDocument {
+                query = query.start(afterDocument: lastDoc)
             }
-            
-            return
-        }
-        
-        
-        
 
-        if let lastDoc = lastDocument {
-            query = query.start(afterDocument: lastDoc)
-        }
-
-        do {
             let snapshot = try await query.getDocuments()
-
-            // Получаем список всех товаров
-            let newProducts = snapshot.documents.compactMap { doc -> Product? in
-                try? doc.data(as: Product.self)
+            var newProducts = snapshot.documents.compactMap { doc -> Product? in
+                var product = try? doc.data(as: Product.self)
+                if let productId = product?.id {
+                    product?.isFavorite = favoriteProductIds.contains(productId)
+                }
+                return product
             }
 
-            // Используем TaskGroup для параллельной загрузки информации о "избранности" товаров
-            var updatedProducts: [Product] = []
-            try await withThrowingTaskGroup(of: Product.self) { group in
-                for product in newProducts {
-                    if let productId = product.id, !self.favoriteProductIds.contains(productId) && self.onlyFavorite {
-                        continue
-                    }
-                    
-                    group.addTask {
-                        guard let productId = product.id else { return product }
-
-                        var updatedProduct = product
-                        var isFavorite = self.favoriteProductIds.contains(productId)
-                        
-                        updatedProduct.isFavorite = isFavorite
-                        
-                        return updatedProduct
-                    }
-                }
-
-                for try await updatedProduct in group {
-                    updatedProducts.append(updatedProduct)
-                }
+            // Если включен фильтр "Только избранное" — оставляем только избранные товары
+            if onlyFavorite {
+                newProducts = newProducts.filter { $0.isFavorite == true }
             }
 
-            // Обновление списка товаров
             DispatchQueue.main.async {
-                self.products.append(contentsOf: updatedProducts)
+                self.products.append(contentsOf: newProducts)
                 self.lastDocument = snapshot.documents.last
-                self.isEndReached = updatedProducts.count < 10
+                self.isEndReached = newProducts.count < 30
                 self.isLoading = false
             }
         } catch {
@@ -115,43 +83,45 @@ class ProductViewModel: ObservableObject {
         }
     }
 
-    // Функция для получения ID избранных товаров
-    private func getFavoriteProductIds(for userId: String) async -> [String] {
-        do {
-            let favoriteSnapshot = try await db.collection("users").document(userId).collection("favorites").getDocuments()
-            let favoriteIds = favoriteSnapshot.documents.compactMap { $0.documentID } // Получаем ID товаров в избранном
-            
-            return favoriteIds
-        } catch {
-            print("Ошибка получения избранных товаров: \(error.localizedDescription)")
-            return []
+    /// Получаем список ID избранных товаров пользователя
+    private func getFavoriteProductIds(for userId: String) async throws -> [String] {
+        let favoriteSnapshot = try await db.collection("users").document(userId).collection("favorites").getDocuments()
+        return favoriteSnapshot.documents.compactMap { $0.documentID }
+    }
+
+    /// Обновление списка товаров после изменения избранного
+    func reloadFavorites() async {
+        DispatchQueue.main.async {
+            self.products = []  // Очищаем список перед загрузкой
+            self.lastDocument = nil
+            self.isEndReached = false
         }
+        await loadProducts()
     }
     
-    // Обновление состояния избранного товара
+    /// Добавление/удаление из избранного
     func toggleFavorite(for product: Product) {
         guard let userId = authViewModel.id, let productID = product.id else { return }
 
-        // Ссылка на документ пользователя и подколлекцию "favorites"
         let favoriteRef = db.collection("users").document(userId).collection("favorites").document(productID)
-        
-        // Проверяем, есть ли уже товар в избранном
+
         favoriteRef.getDocument { document, error in
             if let document = document, document.exists {
-                // Если товар уже в избранном — удаляем
-                favoriteRef.delete() { error in
-                    if let error = error {
-                        self.errorMessage = "Ошибка удаления из избранного: \(error.localizedDescription)"
-                    } else {
-                        // Обновляем список товаров, чтобы отобразить изменения
-                        if let index = self.products.firstIndex(where: { $0.id == productID }) {
-                            self.products[index].isFavorite = false
+                // Удаляем из избранного
+                favoriteRef.delete { error in
+                    if error == nil {
+                        DispatchQueue.main.async {
+                            if let index = self.products.firstIndex(where: { $0.id == productID }) {
+                                self.products[index].isFavorite = false
+                            }
                         }
-                        print("Товар удален из избранного для пользователя \(userId)")
+                        Task {
+                            await self.reloadFavorites()
+                        }
                     }
                 }
             } else {
-                // Если товара нет в избранном — добавляем
+                // Добавляем в избранное
                 let productData: [String: Any] = [
                     "name": product.name,
                     "description": product.description,
@@ -159,29 +129,21 @@ class ProductViewModel: ObservableObject {
                 ]
                 
                 favoriteRef.setData(productData) { error in
-                    if let error = error {
-                        self.errorMessage = "Ошибка добавления в избранное: \(error.localizedDescription)"
-                    } else {
-                        // Обновляем список товаров, чтобы отобразить изменения
-                        if let index = self.products.firstIndex(where: { $0.id == productID }) {
-                            self.products[index].isFavorite = true
+                    if error == nil {
+                        DispatchQueue.main.async {
+                            if let index = self.products.firstIndex(where: { $0.id == productID }) {
+                                self.products[index].isFavorite = true
+                            }
                         }
-                        print("Товар добавлен в избранное для пользователя \(userId)")
+                        Task {
+                            await self.reloadFavorites()
+                        }
                     }
                 }
             }
         }
     }
-
-    
-    func reloadFavorites() async {
-        self.products = [] // Очищаем список перед загрузкой
-        self.lastDocument = nil // Сбрасываем пагинацию
-        self.isEndReached = false
-        await loadProducts()
-    }
 }
-
 // MARK: - Основной экран списка товаров
 struct GoodsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel // Получаем AuthViewModel из environment
@@ -206,32 +168,43 @@ struct GoodsView: View {
                         .progressViewStyle(CircularProgressViewStyle())
                         .padding()
                 } else {
-                    List {
-                        ForEach(viewModel.products) { product in
-                            NavigationLink(destination: ProductDetailView(product: product, viewModel: viewModel)) {
+                    ScrollView {
+                        LazyVStack(spacing: 16) { // Увеличьте расстояние между элементами
+                            ForEach(viewModel.products) { product in
+                                NavigationLink(destination: ProductDetailView(product: product, viewModel: viewModel)) {
+                                    HStack {
+                                        Text(product.name)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Image(systemName: (product.isFavorite ?? false) ? "star.fill" : "star")
+                                            .foregroundColor((product.isFavorite ?? false) ? .yellow : .gray)
+                                    }
+                                    .padding()
+                                    .background(Color.white) // Фон элемента
+                                    .cornerRadius(10) // Закругленные углы
+                                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2) // Тень
+                                }
+                                .buttonStyle(PlainButtonStyle()) // Убираем стандартный стиль кнопки
+                            }
+                            
+                            if !viewModel.isEndReached {
                                 HStack {
-                                    Text(product.name)
-                                        .font(.headline)
                                     Spacer()
-                                    Image(systemName: (product.isFavorite ?? false) ? "star.fill" : "star")
-                                        .foregroundColor((product.isFavorite ?? false) ? .yellow : .gray)
+                                    ProgressView()
+                                        .padding()
+                                        .onAppear {
+                                            Task {
+                                                await viewModel.loadProducts()
+                                            }
+                                        }
+                                    Spacer()
                                 }
                             }
                         }
-                        
-                        if !viewModel.isEndReached {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .padding()
-                                    .onAppear {
-                                        Task {
-                                            await viewModel.loadProducts()
-                                        }
-                                    }
-                                Spacer()
-                            }
-                        }
+                        .padding() // Отступы вокруг всего списка
+                        .background(Color(UIColor.systemGroupedBackground)) // Фон для всего ScrollView
+                        .cornerRadius(12) // Закругленные углы для ScrollView
                     }
                 }
             }
