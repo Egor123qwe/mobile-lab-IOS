@@ -34,7 +34,7 @@ class ProductViewModel: ObservableObject {
         do {
             let favoriteProductIds = try await getFavoriteProductIds(for: userId)
 
-            var query: Query = db.collection("products").order(by: "name").limit(to: 30)
+            var query: Query = db.collection("products").order(by: "name").limit(to: 20)
             if let lastDoc = lastDocument {
                 query = query.start(afterDocument: lastDoc)
             }
@@ -55,7 +55,7 @@ class ProductViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.products.append(contentsOf: newProducts)
                 self.lastDocument = snapshot.documents.last
-                self.isEndReached = newProducts.count < 30
+                self.isEndReached = newProducts.count < 20
                 self.isLoading = false
             }
         } catch {
