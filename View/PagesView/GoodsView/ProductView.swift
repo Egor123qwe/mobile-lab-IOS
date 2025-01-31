@@ -3,6 +3,7 @@ import SwiftUI
 struct ProductsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel: ProductViewModel
+    @State private var searchText = ""
 
     init() {
         _viewModel = StateObject(
@@ -23,52 +24,57 @@ struct ProductsView: View {
                     ProgressView("Загрузка...")
                         .progressViewStyle(CircularProgressViewStyle())
                         .padding()
-                    
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(viewModel.products.indices, id: \.self) { 
-                                index in
-                                
-                                NavigationLink(destination: ProductView(product: $viewModel.products[index], viewModel: viewModel)) {
-                                    
-                                    HStack {
-                                        Text(viewModel.products[index].name)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
-                                        Spacer()
-                                        Image(systemName: (viewModel.products[index].isFavorite ?? false) ? "star.fill" : "star")
-                                            .foregroundColor((viewModel.products[index].isFavorite ?? false) ? .yellow : .gray)
-                                    }
-                                    .padding()
-                                    .background(Color.white)
-                                    .cornerRadius(10)
-                                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                                }
-                                .buttonStyle(PlainButtonStyle())
+                    VStack {
+                        // Поисковое поле
+                        TextField("Фильтрация и поиск по названию", text: $searchText)
+                            .padding()
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onChange(of: searchText) { _ in
+                                viewModel.searchProducts(query: searchText)
                             }
-                            
-                            if !viewModel.isEndReached {
-                                HStack {
-                                    Spacer()
-                                    ProgressView()
-                                        .padding()
-                                        .onAppear {
-                                            Task {
-                                                await viewModel.loadProducts()
-                                            }
+
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(viewModel.filteredProducts.indices, id: \.self) { index in
+                                    NavigationLink(destination: ProductView(product: $viewModel.products[index], viewModel: viewModel)) {
+                                        HStack {
+                                            Text(viewModel.filteredProducts[index].name)
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                            Spacer()
+                                            Image(systemName: (viewModel.filteredProducts[index].isFavorite ?? false) ? "star.fill" : "star")
+                                                .foregroundColor((viewModel.filteredProducts[index].isFavorite ?? false) ? .yellow : .gray)
                                         }
-                                    Spacer()
+                                        .padding()
+                                        .background(Color.white)
+                                        .cornerRadius(10)
+                                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+
+                                if !viewModel.isEndReached {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView()
+                                            .padding()
+                                            .onAppear {
+                                                Task {
+                                                    await viewModel.loadProducts()
+                                                }
+                                            }
+                                        Spacer()
+                                    }
                                 }
                             }
+                            .padding()
+                            .background(Color(UIColor.systemGroupedBackground))
+                            .cornerRadius(12)
                         }
-                        .padding()
-                        .background(Color(UIColor.systemGroupedBackground))
-                        .cornerRadius(12)
                     }
                 }
             }
         }
     }
 }
-

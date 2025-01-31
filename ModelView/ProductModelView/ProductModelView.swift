@@ -1,7 +1,9 @@
 import FirebaseFirestore
+import Combine
 
 class ProductViewModel: ObservableObject {
     @Published var products: [ProductModel] = []
+    @Published var filteredProducts: [ProductModel] = []
     @Published var favoriteProductIds: [String] = []
     @Published var isLoading = false
     @Published var isEndReached = false
@@ -12,7 +14,8 @@ class ProductViewModel: ObservableObject {
     private var lastDocument: DocumentSnapshot? = nil
     private let onlyFavorite: Bool
     private var authViewModel: AuthViewModel
-
+    private var cancellables = Set<AnyCancellable>()
+    
     init(onlyFavorite: Bool = false, authViewModel: AuthViewModel) {
         self.onlyFavorite = onlyFavorite
         self.authViewModel = authViewModel
@@ -29,8 +32,19 @@ class ProductViewModel: ObservableObject {
             self.errorMessage = nil
         }
 
-        guard let userId = authViewModel.id else { return }
+        guard let userId = authViewModel.id else {
+            DispatchQueue.main.async {
+                self.isLoading = false
+            }
+            return
+        }
 
+        // Попытка загрузить данные из кэша, если они есть
+        if self.products.isEmpty {
+            loadFromCache()
+        }
+
+        // Загружаем данные с Firestore
         do {
             let favoriteProductIds = try await getFavoriteProductIds(for: userId)
 
@@ -54,15 +68,26 @@ class ProductViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 self.products.append(contentsOf: newProducts)
+                self.filteredProducts = self.products
                 self.lastDocument = snapshot.documents.last
                 self.isEndReached = newProducts.count < 20
                 self.isLoading = false
+                
+                print("Загруженные продукты: \(self.products.count)")  // Логирование
             }
+
+            // Кэшируем данные
+            saveToCache(products: self.products)
+            print("Сохранены данные в кэш: \(self.products.count) продуктов")
+
         } catch {
             DispatchQueue.main.async {
                 self.errorMessage = "Ошибка загрузки: \(error.localizedDescription)"
                 self.isLoading = false
             }
+
+            // Если произошла ошибка загрузки, пытаемся восстановить из кэша
+            loadFromCache()
         }
     }
 
@@ -74,6 +99,7 @@ class ProductViewModel: ObservableObject {
     func reloadFavorites() async {
         DispatchQueue.main.async {
             self.products = []
+            self.filteredProducts = []
             self.lastDocument = nil
             self.isEndReached = false
         }
@@ -118,6 +144,62 @@ class ProductViewModel: ObservableObject {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Функция для поиска продуктов по имени
+    func searchProducts(query: String) {
+        if query.isEmpty {
+            filteredProducts = products
+        } else {
+            filteredProducts = products.filter { $0.name.lowercased().contains(query.lowercased()) }
+        }
+    }
+    
+    private func saveToCache(products: [ProductModel]) {
+        print("Сохранение данных в кэш, текущий массив продуктов: \(products)")
+
+        let encoder = JSONEncoder()
+
+        if let encoded = try? encoder.encode(products) {
+            let fileManager = FileManager.default
+            if let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let fileURL = documentDirectory.appendingPathComponent("cachedProducts.json")
+
+                do {
+                    try encoded.write(to: fileURL)
+                    print("Продукты сохранены в файл: \(fileURL.path)")
+                } catch {
+                    print("Ошибка при сохранении данных в файл: \(error)")
+                }
+            }
+        } else {
+            print("Ошибка при сериализации продуктов")
+        }
+    }
+
+    private func loadFromCache() {
+        let fileManager = FileManager.default
+        if let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let fileURL = documentDirectory.appendingPathComponent("cachedProducts.json")
+            
+            if let data = try? Data(contentsOf: fileURL) {
+                let decoder = JSONDecoder()
+                do {
+                    let decodedProducts = try decoder.decode([ProductModel].self, from: data)
+                    DispatchQueue.main.async {
+                        if !decodedProducts.isEmpty {
+                            self.products = decodedProducts
+                            self.filteredProducts = self.products
+                            print("Загружены данные из файла: \(self.products.count) продуктов")
+                        }
+                    }
+                } catch {
+                    print("Ошибка при десериализации данных из файла: \(error.localizedDescription)")
+                }
+            } else {
+                print("Нет данных в кэше (файл не найден)")
             }
         }
     }
