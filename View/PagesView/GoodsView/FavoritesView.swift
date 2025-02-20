@@ -46,6 +46,9 @@ struct FavoriteProductsView: View {
                                                     .font(.headline)
                                                     .foregroundColor(.primary)
                                                 Spacer()
+                                                Image(systemName: (viewModel.filteredProducts[index].isFavorite ?? false) ? "star.fill" : "star")
+                                                    .foregroundColor((viewModel.filteredProducts[index].isFavorite ?? false) ? .yellow : .gray)
+                                                
                                             }
                                             .padding()
                                             .background(Color.white)

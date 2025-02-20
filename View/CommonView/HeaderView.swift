@@ -18,7 +18,7 @@ struct HeaderView: View {
     
     private var tabButtons: some View {
         HStack {
-            tabButton(icon: "person.circle.fill", selectedTab: .profile, title: nil)
+            tabButton(icon: nil, selectedTab: .profile, title: "Профиль")
             
             Spacer()
             
@@ -29,7 +29,7 @@ struct HeaderView: View {
             tabButton(icon: nil, selectedTab: .favorites, title: "Избранное")
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 10)
         .background(Color(.systemGray6)) // Цвет фона хедера
         .shadow(color: .gray.opacity(0.4), radius: 5, x: 0, y: 2)
     }

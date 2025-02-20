@@ -24,7 +24,7 @@ struct ProductView: View {
                                         .scaledToFit()
                                         .frame(height: 300)
                                         .cornerRadius(12)
-                                        .shadow(radius: 5)
+                                        //.shadow(radius: 5)
                                 case .failure:
                                     Image(systemName: "photo")
                                         .resizable()
@@ -58,14 +58,13 @@ struct ProductView: View {
                     viewModel.toggleFavorite(for: product)
                 }) {
                     HStack {
-                        Image(systemName: product.isFavorite ?? false ? "heart.fill" : "heart")
-                            .foregroundColor(.white)
+
                         Text(product.isFavorite ?? false ? "Удалить из избранного" : "Добавить в избранное")
                             .bold()
                     }
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.blue)
+                    .background(Color.green)
                     .foregroundColor(.white)
                     .cornerRadius(10)
                     .padding(.horizontal)
@@ -85,9 +84,11 @@ struct ProductView: View {
                                 Text(review.userName)
                                     .font(.subheadline)
                                     .bold()
-                                Spacer()
+                           
                                 Text(String(repeating: "★", count: review.rating))
                                     .foregroundColor(.yellow)
+                                
+                                Spacer()
                             }
                             Text(review.comment)
                                 .font(.body)
@@ -138,7 +139,6 @@ struct ProductView: View {
                             }
                         }) {
                             HStack {
-                                Image(systemName: "paperplane.fill")
                                 Text("Отправить")
                             }
                             .padding()
